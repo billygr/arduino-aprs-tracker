@@ -7,5 +7,5 @@ Arduino APRS Tracker based on libAPRS
 * Adafruit Ultimate GPS https://www.adafruit.com/product/746
 
 ##Libraries
-*TinyGPS http://arduiniana.org/libraries/tinygps/
-*libAPRS (modified) https://github.com/billygr/LibAPRS
+* TinyGPS http://arduiniana.org/libraries/tinygps/
+* libAPRS (modified) https://github.com/billygr/LibAPRS
