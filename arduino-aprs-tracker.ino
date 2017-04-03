@@ -142,6 +142,7 @@ const char *comment = "Arduino APRS Tracker";
 /*
 **  Convert degrees in long format to NMEA string format
 **  DDMM.hhN for latitude and DDDMM.hhW for longitude
+**  D is degrees, M is minutes and h is hundredths of minutes.
 */
 char* deg_to_nmea(long deg, boolean is_lat) {
   bool is_negative=0;
