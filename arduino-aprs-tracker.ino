@@ -149,7 +149,7 @@ char* deg_to_nmea(long deg, boolean is_lat) {
   if (deg < 0) is_negative=1;
 
   // Use the absolute number for calculation and update the buffer at the end
-  //deg = labs(deg);
+  deg = labs(deg);
 
   unsigned long b = (deg % 1000000UL) * 60UL;
   unsigned long a = (deg / 1000000UL) * 100UL + b / 1000000UL;
