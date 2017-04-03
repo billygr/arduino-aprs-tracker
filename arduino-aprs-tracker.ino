@@ -41,7 +41,7 @@ byte month=0, day=0, hour=0, minute=0, second=0, hundredths=0;
 unsigned long age=0;
 
 // buffer for conversions
-#define CONV_BUF_SIZE 20
+#define CONV_BUF_SIZE 16
 static char conv_buf[CONV_BUF_SIZE];
 
 void setup()  
@@ -144,6 +144,12 @@ const char *comment = "Arduino APRS Tracker";
 **  DDMM.hhN for latitude and DDDMM.hhW for longitude
 */
 char* deg_to_nmea(long deg, boolean is_lat) {
+  bool is_negative=0;
+  if (deg < 0) is_negative=1;
+
+  // Use the absolute number for calculation and update the buffer at the end
+  //deg = labs(deg);
+
   unsigned long b = (deg % 1000000UL) * 60UL;
   unsigned long a = (deg / 1000000UL) * 100UL + b / 1000000UL;
   b = (b % 1000000UL) / 10000UL;
@@ -155,15 +161,18 @@ char* deg_to_nmea(long deg, boolean is_lat) {
   snprintf(conv_buf + 6, 3, "%02u", b);
   conv_buf[9] = '\0';
   if (is_lat) {
-    conv_buf[8] = deg > 0 ? 'N': 'S';
-    return conv_buf + 1;
-  } else {
-     conv_buf[8] = deg > 0 ? 'E': 'W';
-     return conv_buf;
-  }
+    if (is_negative) {conv_buf[8]='S';}
+    else conv_buf[8]='N';
+    return conv_buf+1;
+    // conv_buf +1 because we want to omit the leading zero
+    }
+  else {
+    if (is_negative) {conv_buf[8]='W';}
+    else conv_buf[8]='E';
+    return conv_buf;
+    }
 }
 
 void setAprsUpdateFlag() {
   send_aprs_update = true;
 }
-
