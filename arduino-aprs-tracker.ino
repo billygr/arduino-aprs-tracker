@@ -21,7 +21,7 @@
 // APRS settings
 #define APRS_CALLSIGN "NOCALL"
 #define APRS_SSID 5
-#define APRS_SYMBOL ">"
+#define APRS_SYMBOL '>'
 
 // Timer
 #define TIMER_DISABLED -1
