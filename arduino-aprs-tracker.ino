@@ -19,9 +19,9 @@
 #define ADC_REFERENCE REF_3V3
 
 // APRS settings
-#define APRS_CALLSIGN "NOCALL"
-#define APRS_SSID 5
-#define APRS_SYMBOL '>'
+char APRS_CALLSIGN[]="NOCALL";
+const int APRS_SSID=5;
+char APRS_SYMBOL='>';
 
 // Timer
 #define TIMER_DISABLED -1
@@ -118,7 +118,7 @@ void aprs_msg_callback(struct AX25Msg *msg) {
 }
 
 void locationUpdate() {
-const char *comment = "Arduino APRS Tracker";
+  char comment []= "Arduino APRS Tracker";
 
 //  APRS_setLat("5530.80N");
 //  APRS_setLon("01143.89E");
