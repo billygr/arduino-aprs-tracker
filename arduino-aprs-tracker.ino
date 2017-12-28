@@ -120,8 +120,6 @@ void aprs_msg_callback(struct AX25Msg *msg) {
 void locationUpdate() {
   char comment []= "Arduino APRS Tracker";
 
-//  APRS_setLat("5530.80N");
-//  APRS_setLon("01143.89E");
   APRS_setLat((char*)deg_to_nmea(lat, true));
   APRS_setLon((char*)deg_to_nmea(lon, false));
       
@@ -138,11 +136,11 @@ void locationUpdate() {
   GPSSerial.begin(9600);
 }
 
-// https://github.com/sh123/aprs_tracker/blob/master/aprs_tracker.ino
 /*
-**  Convert degrees in long format to NMEA string format
+**  Convert degrees in long format to APRS string format
 **  DDMM.hhN for latitude and DDDMM.hhW for longitude
 **  D is degrees, M is minutes and h is hundredths of minutes.
+**  http://www.aprs.net/vm/DOS/PROTOCOL.HTM
 */
 char* deg_to_nmea(long deg, boolean is_lat) {
   bool is_negative=0;
@@ -154,10 +152,11 @@ char* deg_to_nmea(long deg, boolean is_lat) {
   unsigned long b = (deg % 1000000UL) * 60UL;
   unsigned long a = (deg / 1000000UL) * 100UL + b / 1000000UL;
   b = (b % 1000000UL) / 10000UL;
-  // DDMM.hhN/DDDMM.hhW
-  // http://www.aprs.net/vm/DOS/PROTOCOL.HTM
+
   conv_buf[0] = '0';
-  snprintf(conv_buf + 1, 5, "%04u", a);
+  // in case latitude is a 3 digit number (degrees in long format)
+  if( a > 9999) { snprintf(conv_buf , 6, "%04u", a);} else snprintf(conv_buf + 1, 5, "%04u", a);
+
   conv_buf[5] = '.';
   snprintf(conv_buf + 6, 3, "%02u", b);
   conv_buf[9] = '\0';
