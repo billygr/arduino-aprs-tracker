@@ -1,6 +1,6 @@
 (export (version D)
   (design
-    (source "C:\\Users\\ARO\\Documents\\--- ARO-WORK ---\\01_DIY\\APRS-Tracker_2m\\APRS-Tracker_ArduinoProMini\\APRS-Tracker_ArduinoProMini.sch")
+    (source "APRS-Tracker_ArduinoProMini.sch")
     (date "02.03.2019 10:28:42")
     (tool "Eeschema (5.0.2)-1")
     (sheet (number 1) (name /) (tstamps /)
