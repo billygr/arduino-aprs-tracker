@@ -15,9 +15,9 @@ before_install:
   - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
 install:
   # Note that every library should be installed in a seperate command
-  - if [! -d "$HOME/arduino_ide/libraries/LibAPRS" ]; then git clone https://github.com/billygr/LibAPRS $HOME/arduino_ide/libraries/LibAPRS; fi
-  - if [! -d "$HOME/arduino_ide/libraries/SimpleTimer" ]; then git clone https://github.com/jfturcot/SimpleTimer $HOME/arduino_ide/libraries/SimpleTimer; fi
-  - if [! -d "$HOME/arduino_ide/libraries/TinyGPS" ]; then git clone https://github.com/mikalhart/TinyGPS $HOME/arduino_ide/libraries/TinyGPS; fi
+  - if [ ! -d "$HOME/arduino_ide/libraries/LibAPRS" ]; then git clone https://github.com/billygr/LibAPRS $HOME/arduino_ide/libraries/LibAPRS; fi
+  - if [ ! -d "$HOME/arduino_ide/libraries/SimpleTimer" ]; then git clone https://github.com/jfturcot/SimpleTimer $HOME/arduino_ide/libraries/SimpleTimer; fi
+  - if [ ! -d "$HOME/arduino_ide/libraries/TinyGPS" ]; then git clone https://github.com/mikalhart/TinyGPS $HOME/arduino_ide/libraries/TinyGPS; fi
 script:
   - build_main_platforms
 notifications:
