@@ -1,12 +1,17 @@
-// Arduino APRS Tracker (aat) with Arduino Pro Mini 3.3V/8 MHz
-// Based on https://github.com/sh123/aprs_tracker
-// 
+/***
+ * Arduino APRS Tracker (aat) with Arduino Pro Mini 3.3V/8 MHz
+ * Install the following libraries through Arduino Library Manager
+ * - TinyGPS by Mikal Hart
+ * -
+ * -
+ ***/
+
 #include <SoftwareSerial.h>
 #include <SimpleTimer.h>
 #include <TinyGPS.h>
 #include <LibAPRS.h>
 
-// Single shot button
+// Manual update button
 #define BUTTON_PIN 10
 
 // GPS SoftwareSerial
@@ -18,6 +23,9 @@
 #define OPEN_SQUELCH false
 #define ADC_REFERENCE REF_3V3
 
+// PPT_PIN is defined on libAPRS/device.h
+//#define PPT_PIN 3
+
 // APRS settings
 char APRS_CALLSIGN[]="NOCALL";
 const int APRS_SSID=5;
@@ -25,6 +33,7 @@ char APRS_SYMBOL='>';
 
 // Timer
 #define TIMER_DISABLED -1
+#define TIMER_MINUTES 60L*1000L
 
 TinyGPS gps;
 SoftwareSerial GPSSerial(GPS_RX_PIN, GPS_TX_PIN);
@@ -53,15 +62,20 @@ void setup()
   
   Serial.println(F("Arduino APRS Tracker"));
 
+  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
   //GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+
+  // 1 Hz update rate, not needed for an APRS Tracker
   //GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
+
+  // Request updates on antenna status, keep it disabled
   //GPS.sendCommand(PGCMD_ANTENNA);
 
   APRS_init(ADC_REFERENCE, OPEN_SQUELCH);
   APRS_setCallsign(APRS_CALLSIGN,APRS_SSID);
   APRS_setSymbol(APRS_SYMBOL);
   
-  aprs_update_timer_id=timer.setInterval(2L*60L*1000L, setAprsUpdateFlag);
+  aprs_update_timer_id=timer.setInterval(2*TIMER_MINUTES, setAprsUpdateFlag);
 }
 
 void loop()
@@ -85,8 +99,8 @@ void loop()
     gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
     gps.get_position(&lat, &lon, &age);
 
-    Serial.print(static_cast<int>(day)); Serial.print("/"); Serial.print(static_cast<int>(month)); Serial.print("/"); Serial.print(year);
-    Serial.print(" "); Serial.print(static_cast<int>(hour)); Serial.print(":"); Serial.print(static_cast<int>(minute)); Serial.print(":"); Serial.print(static_cast<int>(second));Serial.print(F(" "));
+    Serial.print(static_cast<int>(day)); Serial.print(F("/")); Serial.print(static_cast<int>(month)); Serial.print(F("/")); Serial.print(year);
+    Serial.print(F(" ")); Serial.print(static_cast<int>(hour)); Serial.print(F(":")); Serial.print(static_cast<int>(minute)); Serial.print(F(":")); Serial.print(static_cast<int>(second));Serial.print(F(" "));
 
     Serial.print(F("LAT="));Serial.print(lat);
     Serial.print(F(" LON="));Serial.print(lon);
@@ -97,18 +111,18 @@ void loop()
 
     Serial.println(deg_to_nmea(lon, false));
 
-  if (digitalRead(BUTTON_PIN)==0)
-  {
-    while(digitalRead(BUTTON_PIN)==0) {}; //debounce
-    Serial.println(F("MANUAL UPDATE"));
-    locationUpdate();
-  }
+    if (digitalRead(BUTTON_PIN)==0)
+    {
+      while(digitalRead(BUTTON_PIN)==0) {}; //debounce
+      Serial.println(F("MANUAL UPDATE"));
+      locationUpdate();
+    }
   
-  if (send_aprs_update) {
-    Serial.println(F("APRS UPDATE"));
-    locationUpdate();
-    send_aprs_update = false;
-  }
+    if (send_aprs_update) {
+      Serial.println(F("APRS UPDATE"));
+      locationUpdate();
+      send_aprs_update = false;
+    }
 
   }
   timer.run();
@@ -129,8 +143,9 @@ void locationUpdate() {
   // TX
   APRS_sendLoc(comment, strlen(comment));
  
-  // read TX LED pin and wait till TX has finished (PB5) digital write 13 LED_BUILTIN
-  while(bitRead(PORTB,5));
+  // read TX LED pin and wait till TX has finished. LibAPRS has TX_LED defined on (PB5), i use LED_BUILTIN on my version as TX_LED
+  // while(bitRead(PORTB,5));
+  while(digitalRead(LED_BUILTIN));
 
   // start SoftSerial again
   GPSSerial.begin(9600);
