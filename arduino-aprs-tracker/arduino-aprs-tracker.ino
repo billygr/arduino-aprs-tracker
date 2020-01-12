@@ -184,10 +184,14 @@ char* deg_to_nmea(long deg, boolean is_lat) {
 
   conv_buf[0] = '0';
   // in case latitude is a 3 digit number (degrees in long format)
-  if( a > 9999) { snprintf(conv_buf , 6, "%04u", a);} else snprintf(conv_buf + 1, 5, "%04u", a);
+  if( a > 9999) {
+    snprintf(conv_buf , 6, "%04lu", a);
+  } else {
+    snprintf(conv_buf + 1, 5, "%04lu", a);
+  }
 
   conv_buf[5] = '.';
-  snprintf(conv_buf + 6, 3, "%02u", b);
+  snprintf(conv_buf + 6, 3, "%02lu", b);
   conv_buf[9] = '\0';
   if (is_lat) {
     if (is_negative) {conv_buf[8]='S';}
