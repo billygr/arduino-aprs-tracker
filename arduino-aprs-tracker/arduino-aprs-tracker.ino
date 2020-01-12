@@ -26,6 +26,9 @@
 // PPT_PIN is defined on libAPRS/device.h
 //#define PPT_PIN 3
 
+// GPS_FIX_LED A3/D17
+#define GPS_FIX_LED A3
+
 // APRS settings
 char APRS_CALLSIGN[]="NOCALL";
 const int APRS_SSID=5;
@@ -59,7 +62,8 @@ void setup()
   GPSSerial.begin(9600);
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  
+  pinMode(GPS_FIX_LED,OUTPUT);
+
   Serial.println(F("Arduino APRS Tracker"));
 
   // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
@@ -98,6 +102,16 @@ void loop()
   {
     gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
     gps.get_position(&lat, &lon, &age);
+
+    if (age == TinyGPS::GPS_INVALID_AGE)
+      Serial.println(F("No fix detected"));
+    else if (age > 5000)
+      Serial.println(F("Warning: possible stale data!"));
+    else
+      {
+        //Serial.println(F("Data is current."));
+        digitalWrite(GPS_FIX_LED, !digitalRead(GPS_FIX_LED)); // Toggles the GPS FIX LED on/off
+      }
 
     Serial.print(static_cast<int>(day)); Serial.print(F("/")); Serial.print(static_cast<int>(month)); Serial.print(F("/")); Serial.print(year);
     Serial.print(F(" ")); Serial.print(static_cast<int>(hour)); Serial.print(F(":")); Serial.print(static_cast<int>(minute)); Serial.print(F(":")); Serial.print(static_cast<int>(second));Serial.print(F(" "));
