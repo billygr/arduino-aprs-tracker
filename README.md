@@ -10,4 +10,4 @@ Arduino APRS Tracker based on libAPRS
 ## Libraries
 * TinyGPS http://arduiniana.org/libraries/tinygps/
 * libAPRS (modified) https://github.com/billygr/LibAPRS
-* SimpleTimer https://github.com/jfturcot/SimpleTimer
+* SimpleTimer (included in the project clone of https://github.com/jfturcot/SimpleTimer)

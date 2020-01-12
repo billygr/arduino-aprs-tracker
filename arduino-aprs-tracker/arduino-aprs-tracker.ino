@@ -7,7 +7,7 @@
  ***/
 
 #include <SoftwareSerial.h>
-#include <SimpleTimer.h>
+#include "src/SimpleTimer/SimpleTimer.h"
 #include <TinyGPS.h>
 #include <LibAPRS.h>
 
