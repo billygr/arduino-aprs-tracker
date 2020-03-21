@@ -34,6 +34,17 @@ char APRS_CALLSIGN[]="NOCALL";
 const int APRS_SSID=5;
 char APRS_SYMBOL='>';
 
+// SmartBeaconing http://www.hamhud.net/hh2/smartbeacon.html
+
+#define LOW_SPEED
+#define HIGH_SPEED
+
+#define SLOW_RATE
+#define FAST_BEACON_RATE
+
+#define TURN_MIN
+#define TURN_SLOPE
+
 // Timer
 #define TIMER_DISABLED -1
 #define TIMER_MINUTES 60L*1000L
