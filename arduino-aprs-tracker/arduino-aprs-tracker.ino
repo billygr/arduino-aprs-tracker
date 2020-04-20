@@ -62,6 +62,9 @@ long lon = 0;
 int year=0;
 byte month=0, day=0, hour=0, minute=0, second=0, hundredths=0;
 unsigned long age=0;
+float falt=0;
+float fkmph=0;
+int ialt=0;
 
 // buffer for conversions
 #define CONV_BUF_SIZE 16
@@ -90,6 +93,7 @@ void setup()
   APRS_setCallsign(APRS_CALLSIGN,APRS_SSID);
   APRS_setSymbol(APRS_SYMBOL);
   
+  // 2xTIMER_MINUTES means an update every two minutes
   aprs_update_timer_id=timer.setInterval(2*TIMER_MINUTES, setAprsUpdateFlag);
 }
 
@@ -113,6 +117,9 @@ void loop()
   {
     gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
     gps.get_position(&lat, &lon, &age);
+    falt = gps.f_altitude(); // +/- altitude in meters
+    fkmph = gps.f_speed_kmph(); // speed in km/hr
+    ialt=int(falt*3.281);  // integer value of altitude in feet
 
     if (age == TinyGPS::GPS_INVALID_AGE)
       Serial.println(F("No fix detected"));
@@ -125,16 +132,18 @@ void loop()
       }
 
     Serial.print(static_cast<int>(day)); Serial.print(F("/")); Serial.print(static_cast<int>(month)); Serial.print(F("/")); Serial.print(year);
-    Serial.print(F(" ")); Serial.print(static_cast<int>(hour)); Serial.print(F(":")); Serial.print(static_cast<int>(minute)); Serial.print(F(":")); Serial.print(static_cast<int>(second));Serial.print(F(" "));
+    Serial.print(F(" ")); Serial.print(static_cast<int>(hour)); Serial.print(F(":")); Serial.print(static_cast<int>(minute)); Serial.print(F(":")); Serial.print(static_cast<int>(second));
 
-    Serial.print(F("LAT="));Serial.print(lat);
-    Serial.print(F(" LON="));Serial.print(lon);
+//    Serial.print(F(" "));
+//    Serial.print(F("LAT="));Serial.print(lat);
+//    Serial.print(F(" LON="));Serial.print(lon);
 
     Serial.print(F(" "));
     Serial.print(deg_to_nmea(lat, true));
     Serial.print(F("/"));
 
-    Serial.println(deg_to_nmea(lon, false));
+    Serial.print(deg_to_nmea(lon, false));
+    Serial.print(F(" Altitude m/ft: ")); Serial.print(falt);Serial.print(F("/"));Serial.println(ialt);
 
     if (digitalRead(BUTTON_PIN)==0)
     {
@@ -143,6 +152,7 @@ void loop()
       locationUpdate();
     }
   
+  // Timer triggered the send_aprs_update flag time to update the location
     if (send_aprs_update) {
       Serial.println(F("APRS UPDATE"));
       locationUpdate();
@@ -157,7 +167,21 @@ void aprs_msg_callback(struct AX25Msg *msg) {
 }
 
 void locationUpdate() {
+//Altitude in Comment Text — The comment may contain an altitude value,
+//in the form /A=aaaaaa, where aaaaaa is the altitude in feet. For example:
+//A=001234. The altitude may appear anywhere in the comment.
+//Source: APRS protcol
+
   char comment []= "Arduino APRS Tracker";
+  char temp[7];
+  char APRS_comment [30]="A/";
+
+  // Convert altitude in string and pad left
+  sprintf(temp, "%05d", ialt);
+
+  strcat(APRS_comment,temp);
+  strcat(APRS_comment,comment);
+//  Serial.println(APRS_comment);
 
   APRS_setLat((char*)deg_to_nmea(lat, true));
   APRS_setLon((char*)deg_to_nmea(lon, false));
@@ -166,7 +190,7 @@ void locationUpdate() {
   GPSSerial.end();
   
   // TX
-  APRS_sendLoc(comment, strlen(comment));
+  APRS_sendLoc(APRS_comment, strlen(comment));
  
   // read TX LED pin and wait till TX has finished. LibAPRS has TX_LED defined on (PB5), i use LED_BUILTIN on my version as TX_LED
   // while(bitRead(PORTB,5));
