@@ -174,7 +174,7 @@ void locationUpdate() {
 
   char comment []= "Arduino APRS Tracker";
   char temp[7];
-  char APRS_comment [30]="A/=";
+  char APRS_comment [30]="/A=";
 
   // Convert altitude in string and pad left
   sprintf(temp, "%05d", ialt);
