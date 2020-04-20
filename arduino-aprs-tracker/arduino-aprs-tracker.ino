@@ -190,7 +190,7 @@ void locationUpdate() {
   GPSSerial.end();
   
   // TX
-  APRS_sendLoc(APRS_comment, strlen(comment));
+  APRS_sendLoc(APRS_comment, strlen(APRS_comment));
  
   // read TX LED pin and wait till TX has finished. LibAPRS has TX_LED defined on (PB5), i use LED_BUILTIN on my version as TX_LED
   // while(bitRead(PORTB,5));
