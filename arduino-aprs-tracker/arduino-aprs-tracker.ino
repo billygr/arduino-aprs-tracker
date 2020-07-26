@@ -2,12 +2,11 @@
  * Arduino APRS Tracker (aat) with Arduino Pro Mini 3.3V/8 MHz
  * Install the following libraries through Arduino Library Manager
  * - TinyGPS by Mikal Hart
- * -
+ * - 
  * -
  ***/
 
 #include <SoftwareSerial.h>
-#include "src/SimpleTimer/SimpleTimer.h"
 #include <TinyGPS.h>
 #include <LibAPRS.h>
 
@@ -16,45 +15,40 @@
 
 // GPS SoftwareSerial
 // Shares pins with (MISO 12/ MOSI 11) used for SPI
-#define GPS_RX_PIN 12
-#define GPS_TX_PIN 11
+#define GPS_RX_PIN 11
+#define GPS_TX_PIN 12
+TinyGPS gps;
+SoftwareSerial GPSSerial(GPS_RX_PIN, GPS_TX_PIN);
 
 // LibAPRS
 #define OPEN_SQUELCH false
-#define ADC_REFERENCE REF_3V3
+#define ADC_REFERENCE REF_5V
+
 
 // PPT_PIN is defined on libAPRS/device.h
 //#define PPT_PIN 3
 
-// GPS_FIX_LED A3/D17
+//GPS_FIX_LED A3/D17
 #define GPS_FIX_LED A3
 
 // APRS settings
-char APRS_CALLSIGN[]="NOCALL";
-const int APRS_SSID=5;
-char APRS_SYMBOL='>';
+char 		APRS_CALLSIGN[] = "NOCALL";
+const int 	APRS_SSID = 5;
+char 		APRS_SYMBOL = '>';
 
-// SmartBeaconing http://www.hamhud.net/hh2/smartbeacon.html
 
-#define LOW_SPEED
-#define HIGH_SPEED
+// SmartBeaconing(tm) Setting  http://www.hamhud.net/hh2/smartbeacon.html
 
-#define SLOW_RATE
-#define FAST_BEACON_RATE
+#define LOW_SPEED	5						// [km/h]
+#define HIGH_SPEED	90
 
-#define TURN_MIN
-#define TURN_SLOPE
+#define SLOW_RATE	1750				// [seg]
+#define FAST_BEACON_RATE  175
 
-// Timer
-#define TIMER_DISABLED -1
-#define TIMER_MINUTES 60L*1000L
+#define TURN_MIN  30
+#define TURN_SLOPE  240
+#define MIN_TURN_TIME 20
 
-TinyGPS gps;
-SoftwareSerial GPSSerial(GPS_RX_PIN, GPS_TX_PIN);
-SimpleTimer timer;
-
-char aprs_update_timer_id = TIMER_DISABLED;
-bool send_aprs_update = false;
 //long instead of float for latitude and longitude
 long lat = 0;
 long lon = 0;
@@ -62,14 +56,19 @@ long lon = 0;
 int year=0;
 byte month=0, day=0, hour=0, minute=0, second=0, hundredths=0;
 unsigned long age=0;
-float falt=0;
-float fkmph=0;
+float falt=0, fkmph=0;
+int speed_kt = 0;
+int currentcourse=0, previouscourse = 0, turn_threshold = 0, courseDelta = 0;
 int ialt=0;
+
+
+unsigned long lastTX =0, tx_interval= 0; 
 
 // buffer for conversions
 #define CONV_BUF_SIZE 16
 static char conv_buf[CONV_BUF_SIZE];
 
+/*****************************************************************************************/
 void setup()  
 {
   Serial.begin(115200);
@@ -93,10 +92,9 @@ void setup()
   APRS_setCallsign(APRS_CALLSIGN,APRS_SSID);
   APRS_setSymbol(APRS_SYMBOL);
   
-  // 2xTIMER_MINUTES means an update every two minutes
-  aprs_update_timer_id=timer.setInterval(2*TIMER_MINUTES, setAprsUpdateFlag);
 }
 
+/*****************************************************************************************/
 void loop()
 {
   bool newData = false;
@@ -117,10 +115,24 @@ void loop()
   {
     gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
     gps.get_position(&lat, &lon, &age);
-    falt = gps.f_altitude(); // +/- altitude in meters
-    fkmph = gps.f_speed_kmph(); // speed in km/hr
-    ialt=int(falt*3.281);  // integer value of altitude in feet
+    
+	falt = gps.f_altitude(); // +/- altitude in meters
+	ialt = int(falt*3.281);  // integer value of altitude in feet
+    
+	fkmph = gps.f_speed_kmph(); // speed in km/hs
+	
+	speed_kt = (int) gps.f_speed_knots();  	
+	
+	currentcourse = (int) gps.f_course(); 
 
+	// Calculate difference of course to smartbeacon
+  courseDelta = (int) ( previouscourse - currentcourse );   
+  courseDelta = abs (courseDelta);
+	if (courseDelta > 180) {
+		 courseDelta = courseDelta - 360;
+	}
+  courseDelta = abs (courseDelta) ;
+	
     if (age == TinyGPS::GPS_INVALID_AGE)
       Serial.println(F("No fix detected"));
     else if (age > 5000)
@@ -131,20 +143,19 @@ void loop()
         digitalWrite(GPS_FIX_LED, !digitalRead(GPS_FIX_LED)); // Toggles the GPS FIX LED on/off
       }
 
+
     Serial.print(static_cast<int>(day)); Serial.print(F("/")); Serial.print(static_cast<int>(month)); Serial.print(F("/")); Serial.print(year);
     Serial.print(F(" ")); Serial.print(static_cast<int>(hour)); Serial.print(F(":")); Serial.print(static_cast<int>(minute)); Serial.print(F(":")); Serial.print(static_cast<int>(second));
-
-//    Serial.print(F(" "));
-//    Serial.print(F("LAT="));Serial.print(lat);
-//    Serial.print(F(" LON="));Serial.print(lon);
-
+	Serial.print(F(" "));
+	Serial.print(F("LAT="));Serial.print(lat);
+	Serial.print(F(" LON="));Serial.print(lon);
     Serial.print(F(" "));
     Serial.print(deg_to_nmea(lat, true));
     Serial.print(F("/"));
-
-    Serial.print(deg_to_nmea(lon, false));
+	Serial.print(deg_to_nmea(lon, false));
     Serial.print(F(" Altitude m/ft: ")); Serial.print(falt);Serial.print(F("/"));Serial.println(ialt);
 
+	
     if (digitalRead(BUTTON_PIN)==0)
     {
       while(digitalRead(BUTTON_PIN)==0) {}; //debounce
@@ -152,54 +163,81 @@ void loop()
       locationUpdate();
     }
   
-  // Timer triggered the send_aprs_update flag time to update the location
-    if (send_aprs_update) {
-      Serial.println(F("APRS UPDATE"));
-      locationUpdate();
-      send_aprs_update = false;
-    }
+  // Based on HamHUB Smart Beaconing(tm) algorithm 
+	if ( fkmph < LOW_SPEED ) {
+		tx_interval = SLOW_RATE *1000L;        
+	}
+	else if ( fkmph > HIGH_SPEED) {
+		tx_interval = FAST_BEACON_RATE  *1000L;
+	}
+	else {
+		// Interval inbetween low and high speed 
+		tx_interval = ((FAST_BEACON_RATE * HIGH_SPEED) / fkmph ) *1000L ;      
+	}
+
+	turn_threshold = TURN_MIN + TURN_SLOPE / fkmph;
+	
+	if (   courseDelta > turn_threshold ){
+		if ( millis() - lastTX > MIN_TURN_TIME *1000L){		
+			Serial.println(F("APRS UPDATE"));
+			locationUpdate();
+			lastTX = millis();
+		}
+	}
+	
+	previouscourse = currentcourse;
+	
+	if ( millis() - lastTX > tx_interval) {
+		Serial.println(F("APRS UPDATE"));
+		locationUpdate();
+		lastTX = millis();
+	}
 
   }
-  timer.run();
+
 }
 
+/*****************************************************************************************/
 void aprs_msg_callback(struct AX25Msg *msg) {
 }
 
+/*****************************************************************************************/
 void locationUpdate() {
 //Altitude in Comment Text — The comment may contain an altitude value,
 //in the form /A=aaaaaa, where aaaaaa is the altitude in feet. For example:
 //A=001234. The altitude may appear anywhere in the comment.
 //Source: APRS protcol
 
-  char comment []= "Arduino APRS Tracker";
+  char comment []= "Smart tracker TEST";
   char temp[8];
   char APRS_comment [36]="/A=";
 
   // Convert altitude in string and pad left
   sprintf(temp, "%06d", ialt);
-
   strcat(APRS_comment,temp);
   strcat(APRS_comment,comment);
-//  Serial.println(APRS_comment);
+  //Serial.println(APRS_comment);
 
   APRS_setLat((char*)deg_to_nmea(lat, true));
   APRS_setLon((char*)deg_to_nmea(lon, false));
-      
+  
+  APRS_setSpeed(speed_kt);
+  APRS_setCourse(currentcourse);
+
   // turn off SoftSerial to stop interrupting tx
   GPSSerial.end();
   
   // TX
   APRS_sendLoc(APRS_comment, strlen(APRS_comment));
- 
+  
   // read TX LED pin and wait till TX has finished. LibAPRS has TX_LED defined on (PB5), i use LED_BUILTIN on my version as TX_LED
-  // while(bitRead(PORTB,5));
   while(digitalRead(LED_BUILTIN));
 
   // start SoftSerial again
   GPSSerial.begin(9600);
 }
 
+/*****************************************************************************************/
 /*
 **  Convert degrees in long format to APRS string format
 **  DDMM.hhN for latitude and DDDMM.hhW for longitude
@@ -239,8 +277,4 @@ char* deg_to_nmea(long deg, boolean is_lat) {
     else conv_buf[8]='E';
     return conv_buf;
     }
-}
-
-void setAprsUpdateFlag() {
-  send_aprs_update = true;
 }
