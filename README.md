@@ -1,6 +1,7 @@
 # arduino-aprs-tracker
 
 Arduino APRS Tracker based on libAPRS
+Now with smartbeaconing support. Use the smartbeaconing branch
 
 ## Hardware
 * Arduino Pro Mini 3.3V 8 MHz https://www.adafruit.com/products/2377
