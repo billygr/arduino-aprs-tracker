@@ -108,7 +108,11 @@ void loop()
       char c = GPSSerial.read();
       // Serial.write(c); // uncomment this line if you want to see the GPS data flowing
       if (gps.encode(c)) // Did a new valid sentence come in?
-        newData = true;
+      {
+      // FIXME potential wrong data coming from GPS
+        gps.get_position(&lat, &lon, &age);
+        if (lat != 0) newData = true;
+      }
     }
   }
 
