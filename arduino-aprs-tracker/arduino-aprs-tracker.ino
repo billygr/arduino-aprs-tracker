@@ -54,16 +54,9 @@ char APRS_SYMBOL = '>';
 long lat = 0;
 long lon = 0;
 
-int year=0;
-byte month=0, day=0, hour=0, minute=0, second=0, hundredths=0;
-unsigned long age=0;
-float falt=0, fkmph=0;
 int speed_kt = 0;
-int currentcourse=0, previouscourse = 0, turn_threshold = 0, courseDelta = 0;
+int currentcourse=0;
 int ialt=0;
-
-
-unsigned long lastTX =0, tx_interval= 0;
 
 // buffer for conversions
 #define CONV_BUF_SIZE 16
@@ -99,7 +92,15 @@ void setup()
 void loop()
 {
   bool newData = false;
+  int year=0;
+  byte month=0, day=0, hour=0, minute=0, second=0, hundredths=0;
+  unsigned long age=0;
 
+  float falt=0, fkmph=0;
+
+  unsigned long lastTX =0, tx_interval= 0;
+
+  int previouscourse = 0, turn_threshold = 0, courseDelta = 0;
   // For one second we parse GPS data
   for (unsigned long start = millis(); millis() - start < 1000;)
   {
