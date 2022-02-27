@@ -85,15 +85,13 @@ void setup()
   APRS_init(ADC_REFERENCE, OPEN_SQUELCH);
   APRS_setCallsign(APRS_CALLSIGN,APRS_SSID);
   APRS_setSymbol(APRS_SYMBOL);
-  
 }
 
 /*****************************************************************************************/
 void loop()
 {
   bool newData = false;
-  int year=0;
-  byte month=0, day=0, hour=0, minute=0, second=0, hundredths=0;
+  int year=0;byte month=0, day=0, hour=0, minute=0, second=0;
   unsigned long age=0;
 
   float falt=0, fkmph=0;
@@ -101,6 +99,7 @@ void loop()
   unsigned long lastTX =0, tx_interval= 0;
 
   int previouscourse = 0, turn_threshold = 0, courseDelta = 0;
+
   // For one second we parse GPS data
   for (unsigned long start = millis(); millis() - start < 1000;)
   {
@@ -183,9 +182,11 @@ void loop()
 
     turn_threshold = TURN_MIN + TURN_SLOPE / fkmph;
 
+    Serial.print(F("currentcourse/courseDelta/turn_threshold: "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);Serial.print(F(" "));Serial.println(turn_threshold);
+
     if (courseDelta > turn_threshold ){
       if ( millis() - lastTX > MIN_TURN_TIME *1000L){
-        Serial.println(F("APRS UPDATE"));
+        Serial.println(F("APRS UPDATE because of millis() - lastTX > MIN_TURN_TIME *1000L"));
         locationUpdate();
         lastTX = millis();
       }
@@ -194,13 +195,11 @@ void loop()
     previouscourse = currentcourse;
 
     if ( millis() - lastTX > tx_interval) {
-      Serial.println(F("APRS UPDATE"));
+      Serial.println(F("APRS UPDATE because of millis() - lastTX > tx_interval"));
       locationUpdate();
       lastTX = millis();
     }
-
   }
-
 }
 
 /*****************************************************************************************/
