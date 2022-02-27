@@ -130,7 +130,8 @@ void loop()
 
     // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
     currentcourse = (int) gps.f_course();
-    if (currentcourse = 1000) Serial.println("Wrong course data from GPS");
+
+    if (currentcourse == 1000) Serial.println("Wrong course data from GPS");
 
     // Calculate difference of course to smartbeacon
     courseDelta = (int) ( previouscourse - currentcourse );
