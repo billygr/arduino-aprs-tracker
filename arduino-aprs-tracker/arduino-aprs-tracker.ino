@@ -56,7 +56,7 @@ long lon = 0;
 
 int speed_kt = 0;
 int currentcourse=0;
-int ialt=0;
+int ialtitude_feet=0;
 
 // buffer for conversions
 #define CONV_BUF_SIZE 16
@@ -94,7 +94,7 @@ void loop()
   int year=0;byte month=0, day=0, hour=0, minute=0, second=0;
   unsigned long age=0;
 
-  float falt=0, fkmph=0;
+  float faltitude_meters=0, fkmph=0;
 
   unsigned long lastTX =0, tx_interval= 0;
 
@@ -109,26 +109,28 @@ void loop()
       // Serial.write(c); // uncomment this line if you want to see the GPS data flowing
       if (gps.encode(c)) // Did a new valid sentence come in?
       {
-      // FIXME potential wrong data coming from GPS
         gps.get_position(&lat, &lon, &age);
         if (lat != 0) newData = true;
       }
-    }
+     }
   }
 
   if (newData)
   {
     gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
     gps.get_position(&lat, &lon, &age);
-    
-    falt = gps.f_altitude(); // +/- altitude in meters
-    ialt = int(falt*3.281);  // integer value of altitude in feet
+
+    // TinyGPS reports TinyGPS::GPS_INVALID_F_ALTITUDE = 1000000.0 for invalid altitude
+    faltitude_meters = gps.f_altitude(); // +/- altitude in meters
+    ialtitude_feet = int(faltitude_meters*3.281);  // integer value of altitude in feet
 
     fkmph = gps.f_speed_kmph(); // speed in km/hs
 
     speed_kt = (int) gps.f_speed_knots();
 
+    // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
     currentcourse = (int) gps.f_course();
+    if (currentcourse = 1000) Serial.println("Wrong course data from GPS");
 
     // Calculate difference of course to smartbeacon
     courseDelta = (int) ( previouscourse - currentcourse );
@@ -158,7 +160,7 @@ void loop()
     Serial.print(deg_to_nmea(lat, true));
     Serial.print(F("/"));
     Serial.print(deg_to_nmea(lon, false));
-    Serial.print(F(" Altitude m/ft: ")); Serial.print(falt);Serial.print(F("/"));Serial.println(ialt);
+    Serial.print(F(" Altitude m/ft: ")); Serial.print(faltitude_meters);Serial.print(F("/"));Serial.println(ialtitude_feet);
 
 
     if (digitalRead(BUTTON_PIN)==0)
@@ -167,7 +169,10 @@ void loop()
       Serial.println(F("MANUAL UPDATE"));
       locationUpdate();
     }
-  
+
+// TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
+    if (currentcourse != 1000)
+    {
     // Based on HamHUB Smart Beaconing(tm) algorithm
     if ( fkmph < LOW_SPEED ) {
       tx_interval = SLOW_RATE *1000L;
@@ -199,6 +204,7 @@ void loop()
       locationUpdate();
       lastTX = millis();
     }
+    }
   }
 }
 
@@ -218,7 +224,7 @@ void locationUpdate() {
   char APRS_comment [36]="/A=";
 
   // Convert altitude in string and pad left
-  sprintf(temp, "%06d", ialt);
+  sprintf(temp, "%06d", ialtitude_feet);
   strcat(APRS_comment,temp);
   strcat(APRS_comment,comment);
   //Serial.println(APRS_comment);
