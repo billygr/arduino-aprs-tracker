@@ -58,6 +58,9 @@ int speed_kt = 0;
 int currentcourse=0;
 int ialtitude_feet=0;
 
+unsigned long lastTX =0, tx_interval= 0;
+int previouscourse = 0, turn_threshold = 0, courseDelta = 0;
+
 // buffer for conversions
 #define CONV_BUF_SIZE 16
 static char conv_buf[CONV_BUF_SIZE];
@@ -95,10 +98,6 @@ void loop()
   unsigned long age=0;
 
   float faltitude_meters=0, fkmph=0;
-
-  unsigned long lastTX =0, tx_interval= 0;
-
-  int previouscourse = 0, turn_threshold = 0, courseDelta = 0;
 
   // For one second we parse GPS data
   for (unsigned long start = millis(); millis() - start < 1000;)
@@ -188,7 +187,8 @@ void loop()
 
     turn_threshold = TURN_MIN + TURN_SLOPE / fkmph;
 
-    Serial.print(F("currentcourse/courseDelta/turn_threshold: "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);Serial.print(F(" "));Serial.println(turn_threshold);
+    Serial.print(F("currentcourse/courseDelta/turn_threshold: "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);
+    Serial.print(F(" "));Serial.println(turn_threshold);
 
     if (courseDelta > turn_threshold ){
       if ( millis() - lastTX > MIN_TURN_TIME *1000L){
@@ -199,7 +199,7 @@ void loop()
     }
 
     previouscourse = currentcourse;
-
+    // tx_internal with default values 1750000 milliseconds/1750 seconds/29.16 minutes
     if ( millis() - lastTX > tx_interval) {
       Serial.println(F("APRS UPDATE because of millis() - lastTX > tx_interval"));
       locationUpdate();
