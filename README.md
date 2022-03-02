@@ -1,6 +1,6 @@
 # arduino-aprs-tracker
 
-Arduino APRS Tracker based on libAPRS
+Arduino APRS Tracker based on libAPRS with SmartBeaconing
 
 ## Hardware
 * Arduino Pro Mini 3.3V 8 MHz https://www.adafruit.com/products/2377
@@ -10,4 +10,3 @@ Arduino APRS Tracker based on libAPRS
 ## Libraries
 * TinyGPS http://arduiniana.org/libraries/tinygps/
 * libAPRS (modified) https://github.com/billygr/LibAPRS
-* SimpleTimer (included in the project clone of https://github.com/jfturcot/SimpleTimer)

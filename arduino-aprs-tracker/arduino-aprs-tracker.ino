@@ -7,7 +7,6 @@
  ***/
 
 #include <SoftwareSerial.h>
-#include "src/SimpleTimer/SimpleTimer.h"
 #include <TinyGPS.h>
 #include <LibAPRS.h>
 
@@ -24,7 +23,6 @@ SoftwareSerial GPSSerial(GPS_RX_PIN, GPS_TX_PIN);
 // LibAPRS
 #define OPEN_SQUELCH false
 #define ADC_REFERENCE REF_3V3
-
 
 // PPT_PIN is defined on libAPRS/device.h
 //#define PPT_PIN 3
@@ -55,10 +53,10 @@ long lat = 0;
 long lon = 0;
 
 int speed_kt = 0;
-int currentcourse=0;
-int ialtitude_feet=0;
+int currentcourse = 0;
+int ialtitude_feet = 0;
 
-unsigned long lastTX =0, tx_interval= 0;
+unsigned long lastTX = 0, tx_interval = 0;
 int previouscourse = 0, turn_threshold = 0, courseDelta = 0;
 
 // buffer for conversions
@@ -88,49 +86,127 @@ void setup()
   APRS_init(ADC_REFERENCE, OPEN_SQUELCH);
   APRS_setCallsign(APRS_CALLSIGN,APRS_SSID);
   APRS_setSymbol(APRS_SYMBOL);
+
+  Serial.print(F("Callsign:     ")); Serial.print(APRS_CALLSIGN); Serial.print(F("-")); Serial.println(APRS_SSID);
+  Serial.print(F("Free RAM:     ")); Serial.println(freeMemory());
 }
 
+static void smartdelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do
+  {
+    while (GPSSerial.available())
+      gps.encode(GPSSerial.read());
+  } while (millis() - start < ms);
+}
+
+static void print_int(unsigned long val, unsigned long invalid, int len)
+{
+  char sz[32];
+  if (val == invalid)
+    strcpy(sz, "*******");
+  else
+    sprintf(sz, "%ld", val);
+  sz[len] = 0;
+  for (int i=strlen(sz); i<len; ++i)
+    sz[i] = ' ';
+  if (len > 0)
+    sz[len-1] = ' ';
+  Serial.print(sz);
+  smartdelay(0);
+}
+
+static void print_float(float val, float invalid, int len, int prec)
+{
+  if (val == invalid)
+  {
+    while (len-- > 1)
+      Serial.print('*');
+    Serial.print(' ');
+  }
+  else
+  {
+    Serial.print(val, prec);
+    int vi = abs((int)val);
+    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
+    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
+    for (int i=flen; i<len; ++i)
+      Serial.print(' ');
+  }
+  smartdelay(0);
+}
+
+static void print_date(TinyGPS &gps)
+{
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  unsigned long age;
+  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
+  if (age == TinyGPS::GPS_INVALID_AGE)
+    Serial.print(F("********** ******** "));
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d/%02d/%02d %02d:%02d:%02d ",
+        month, day, year, hour, minute, second);
+    Serial.print(sz);
+  }
+  smartdelay(0);
+}
 /*****************************************************************************************/
 void loop()
 {
   bool newData = false;
-  int year=0;byte month=0, day=0, hour=0, minute=0, second=0;
+  float flat, flon;
+
   unsigned long age=0;
 
   float faltitude_meters=0, fkmph=0;
 
-  // For one second we parse GPS data
-  for (unsigned long start = millis(); millis() - start < 1000;)
+  // Process GPS data every second (or so)
+  smartdelay(1000);
+  gps.get_position(&lat, &lon, &age);
+
+  while (age == TinyGPS::GPS_INVALID_AGE)
   {
-    while (GPSSerial.available())
-    {
-      char c = GPSSerial.read();
-      // Serial.write(c); // uncomment this line if you want to see the GPS data flowing
-      if (gps.encode(c)) // Did a new valid sentence come in?
-      {
-        gps.get_position(&lat, &lon, &age);
-        if (lat != 0) newData = true;
-      }
-     }
+    // It is not an ideal check but provides a good indication, could be no fix/GPS is not connected/GPS is sending garbage
+    Serial.println(F("No fix detected"));
+    smartdelay(1000);
+    gps.get_position(&lat, &lon, &age);
   }
+
+  // Do a check based on altitude if invalid the lat/long will be wrong
+  while (gps.f_altitude() == TinyGPS::GPS_INVALID_F_ALTITUDE)
+  {
+    Serial.print(F("Waiting for valid lat/lon "));
+    print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
+    print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
+    Serial.println();
+    smartdelay(1000);
+    gps.f_get_position(&flat, &flon, &age);
+  }
+
+  if (lat != 0) {newData = true;} else newData=false;
 
   if (newData)
   {
-    gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, NULL, &age);
+    // Parse twice the location with both float and long. Using float helps to paste it directly to google maps for troubleshooting
     gps.get_position(&lat, &lon, &age);
+    gps.f_get_position(&flat, &flon, &age);
 
     // TinyGPS reports TinyGPS::GPS_INVALID_F_ALTITUDE = 1000000.0 for invalid altitude
     faltitude_meters = gps.f_altitude(); // +/- altitude in meters
     ialtitude_feet = int(faltitude_meters*3.281);  // integer value of altitude in feet
 
-    fkmph = gps.f_speed_kmph(); // speed in km/hs
+    fkmph = gps.f_speed_kmph(); // speed in km/h
 
-    speed_kt = (int) gps.f_speed_knots();
+    speed_kt = (int) gps.f_speed_knots(); // speed in knots for APRS
 
-    // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
+    // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course
     currentcourse = (int) gps.f_course();
 
-    if (currentcourse == 1000) Serial.println("Wrong course data from GPS");
+    if (currentcourse == 1000) Serial.println(F("DEBUG: Wrong course data from GPS"));
 
     // Calculate difference of course to smartbeacon
     courseDelta = (int) ( previouscourse - currentcourse );
@@ -140,37 +216,15 @@ void loop()
     }
     courseDelta = abs (courseDelta) ;
 
-    if (age == TinyGPS::GPS_INVALID_AGE)
-      Serial.println(F("No fix detected"));
-    else if (age > 5000)
-      Serial.println(F("Warning: possible stale data!"));
-    else
-      {
-        //Serial.println(F("Data is current."));
-        digitalWrite(GPS_FIX_LED, !digitalRead(GPS_FIX_LED)); // Toggles the GPS FIX LED on/off
-      }
+    digitalWrite(GPS_FIX_LED, !digitalRead(GPS_FIX_LED)); // Toggle the GPS_FIX_LED on/off
 
+    print_date(gps);
+    print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
+    print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
+    Serial.print(deg_to_nmea(lat, true));Serial.print(F("/"));Serial.print(deg_to_nmea(lon, false));
+    Serial.print(F(" Altitude m/ft: ")); Serial.print(faltitude_meters);Serial.print(F("/"));Serial.print(ialtitude_feet);
 
-    Serial.print(static_cast<int>(day)); Serial.print(F("/")); Serial.print(static_cast<int>(month)); Serial.print(F("/")); Serial.print(year);
-    Serial.print(F(" ")); Serial.print(static_cast<int>(hour)); Serial.print(F(":")); Serial.print(static_cast<int>(minute)); Serial.print(F(":")); Serial.print(static_cast<int>(second));
-    Serial.print(F(" "));
-    Serial.print(F("LAT="));Serial.print(lat);
-    Serial.print(F(" LON="));Serial.print(lon);
-    Serial.print(F(" "));
-    Serial.print(deg_to_nmea(lat, true));
-    Serial.print(F("/"));
-    Serial.print(deg_to_nmea(lon, false));
-    Serial.print(F(" Altitude m/ft: ")); Serial.print(faltitude_meters);Serial.print(F("/"));Serial.println(ialtitude_feet);
-
-
-    if (digitalRead(BUTTON_PIN)==0)
-    {
-      while(digitalRead(BUTTON_PIN)==0) {}; //debounce
-      Serial.println(F("MANUAL UPDATE"));
-      locationUpdate();
-    }
-
-// TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
+    // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
     if (currentcourse != 1000)
     {
     // Based on HamHUB Smart Beaconing(tm) algorithm
@@ -187,12 +241,12 @@ void loop()
 
     turn_threshold = TURN_MIN + TURN_SLOPE / fkmph;
 
-    Serial.print(F("currentcourse/courseDelta/turn_threshold: "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);
+    Serial.print(F(" Course: current/Delta/turn_threshold: "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);
     Serial.print(F(" "));Serial.println(turn_threshold);
 
     if (courseDelta > turn_threshold ){
       if ( millis() - lastTX > MIN_TURN_TIME *1000L){
-        Serial.println(F("APRS UPDATE because of millis() - lastTX > MIN_TURN_TIME *1000L"));
+        Serial.println(F("DEBUG: APRS UPDATE because of millis() - lastTX > MIN_TURN_TIME *1000L"));
         locationUpdate();
         lastTX = millis();
       }
@@ -201,9 +255,16 @@ void loop()
     previouscourse = currentcourse;
     // tx_internal with default values 1750000 milliseconds/1750 seconds/29.16 minutes
     if ( millis() - lastTX > tx_interval) {
-      Serial.println(F("APRS UPDATE because of millis() - lastTX > tx_interval"));
+      Serial.println(F("DEBUG: APRS UPDATE because of millis() - lastTX > tx_interval"));
       locationUpdate();
       lastTX = millis();
+    }
+
+    if (digitalRead(BUTTON_PIN)==0)
+    {
+      while(digitalRead(BUTTON_PIN)==0) {}; //debounce
+      Serial.println(F("MANUAL UPDATE"));
+      locationUpdate();
     }
     }
   }
