@@ -59,6 +59,7 @@ int ialtitude_feet = 0;
 unsigned long lastTX = 0, tx_interval = 0;
 int previouscourse = 0, turn_threshold = 0, courseDelta = 0;
 
+bool newData = false;
 // buffer for conversions
 #define CONV_BUF_SIZE 16
 static char conv_buf[CONV_BUF_SIZE];
@@ -89,6 +90,10 @@ void setup()
 
   Serial.print(F("Callsign:     ")); Serial.print(APRS_CALLSIGN); Serial.print(F("-")); Serial.println(APRS_SSID);
   Serial.print(F("Free RAM:     ")); Serial.println(freeMemory());
+  Serial.println(F("Date       Time     Latitude  Longitude  Course Speed APRS Lat/Lon       Altitude   Course Delta/turn_turn_threshold"));
+  Serial.println(F("                    (deg)     (deg)      (deg)  (Km/h)DDMM.mmN/DDDMM.mmW (m/ft)                "));
+  Serial.println(F("-----------------------------------------------------------------------------------------------"));
+
 }
 
 static void smartdelay(unsigned long ms)
@@ -97,7 +102,10 @@ static void smartdelay(unsigned long ms)
   do
   {
     while (GPSSerial.available())
-      gps.encode(GPSSerial.read());
+      {
+        if (gps.encode(GPSSerial.read())) newData = true;
+
+      }
   } while (millis() - start < ms);
 }
 
@@ -157,7 +165,6 @@ static void print_date(TinyGPS &gps)
 /*****************************************************************************************/
 void loop()
 {
-  bool newData = false;
   float flat, flon;
 
   unsigned long age=0;
@@ -187,9 +194,9 @@ void loop()
     gps.f_get_position(&flat, &flon, &age);
   }
 
-  if (lat != 0) {newData = true;} else newData=false;
+  //if (lat != 0) {newData = true;} else newData=false;
 
-  if (newData)
+  if (newData && lat !=0)
   {
     // Parse twice the location with both float and long. Using float helps to paste it directly to google maps for troubleshooting
     gps.get_position(&lat, &lon, &age);
@@ -221,8 +228,10 @@ void loop()
     print_date(gps);
     print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
     print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
+    print_float(gps.f_course(), TinyGPS::GPS_INVALID_F_ANGLE, 7, 2);
+    print_float(gps.f_speed_kmph(), TinyGPS::GPS_INVALID_F_SPEED, 6, 2);
     Serial.print(deg_to_nmea(lat, true));Serial.print(F("/"));Serial.print(deg_to_nmea(lon, false));
-    Serial.print(F(" Altitude m/ft: ")); Serial.print(faltitude_meters);Serial.print(F("/"));Serial.print(ialtitude_feet);
+    Serial.print(F(" ")); Serial.print(faltitude_meters);Serial.print(F("/"));Serial.print(ialtitude_feet);
 
     // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
     if (currentcourse != 1000)
@@ -241,7 +250,7 @@ void loop()
 
     turn_threshold = TURN_MIN + TURN_SLOPE / fkmph;
 
-    Serial.print(F(" Course: current/Delta/turn_threshold: "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);
+    Serial.print(F(" "));Serial.print(currentcourse);Serial.print(F(" "));Serial.print(courseDelta);
     Serial.print(F(" "));Serial.println(turn_threshold);
 
     if (courseDelta > turn_threshold ){
@@ -267,7 +276,14 @@ void loop()
       locationUpdate();
     }
     }
+    else
+    {
+      //print dummy course/delta/turn_threshold
+      Serial.println(F(" *** *** ****"));
+
+    }
   }
+  newData = false;
 }
 
 /*****************************************************************************************/
@@ -279,7 +295,7 @@ void locationUpdate() {
 //Altitude in Comment Text — The comment may contain an altitude value,
 //in the form /A=aaaaaa, where aaaaaa is the altitude in feet. For example:
 //A=001234. The altitude may appear anywhere in the comment.
-//Source: APRS protcol
+//Source: APRS protocol
 
   char comment []= "Arduino APRS Tracker";
   char temp[8];
