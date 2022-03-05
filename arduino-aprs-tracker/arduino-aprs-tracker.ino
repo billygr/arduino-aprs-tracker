@@ -10,6 +10,11 @@
 #include <TinyGPS.h>
 #include <LibAPRS.h>
 
+// Enable this define NEO-6M if you are constantly getting wrong data,
+// the ADC ISR triggers during SoftwareSerial so we miss data coming from GPS
+// (for some reason only on this type of GPS and only when running on 9600 bps)
+//#define NEO-6M
+
 // Manual update button
 #define BUTTON_PIN 10
 
@@ -70,19 +75,16 @@ void setup()
   Serial.begin(115200);
   GPSSerial.begin(9600);
 
+#ifdef NEO-6M
+  GPSSerial.print("$PUBX,41,1,0007,0003,4800,0*13\r\n");
+  GPSSerial.begin(4800);
+  GPSSerial.flush();
+#endif
+
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(GPS_FIX_LED,OUTPUT);
 
   Serial.println(F("Arduino APRS Tracker"));
-
-  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
-  //GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-
-  // 1 Hz update rate, not needed for an APRS Tracker
-  //GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
-
-  // Request updates on antenna status, keep it disabled
-  //GPS.sendCommand(PGCMD_ANTENNA);
 
   APRS_init(ADC_REFERENCE, OPEN_SQUELCH);
   APRS_setCallsign(APRS_CALLSIGN,APRS_SSID);
@@ -90,10 +92,9 @@ void setup()
 
   Serial.print(F("Callsign:     ")); Serial.print(APRS_CALLSIGN); Serial.print(F("-")); Serial.println(APRS_SSID);
   Serial.print(F("Free RAM:     ")); Serial.println(freeMemory());
-  Serial.println(F("Date       Time     Latitude  Longitude  Course Speed APRS Lat/Lon       Altitude   Course Delta/turn_turn_threshold"));
+  Serial.println(F("Date       Time     Latitude  Longitude  Course Speed APRS Lat/Lon       Altitude   Course current/Delta/turn_threshold"));
   Serial.println(F("                    (deg)     (deg)      (deg)  (Km/h)DDMM.mmN/DDDMM.mmW (m/ft)                "));
   Serial.println(F("-----------------------------------------------------------------------------------------------"));
-
 }
 
 static void smartdelay(unsigned long ms)
@@ -183,19 +184,6 @@ void loop()
     gps.get_position(&lat, &lon, &age);
   }
 
-  // Do a check based on altitude if invalid the lat/long will be wrong
-  while (gps.f_altitude() == TinyGPS::GPS_INVALID_F_ALTITUDE)
-  {
-    Serial.print(F("Waiting for valid lat/lon "));
-    print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
-    print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
-    Serial.println();
-    smartdelay(1000);
-    gps.f_get_position(&flat, &flon, &age);
-  }
-
-  //if (lat != 0) {newData = true;} else newData=false;
-
   if (newData && lat !=0)
   {
     // Parse twice the location with both float and long. Using float helps to paste it directly to google maps for troubleshooting
@@ -204,16 +192,23 @@ void loop()
 
     // TinyGPS reports TinyGPS::GPS_INVALID_F_ALTITUDE = 1000000.0 for invalid altitude
     faltitude_meters = gps.f_altitude(); // +/- altitude in meters
+
+    // Quick fix to ignore wrong data in calculations
+    if (int (faltitude_meters) > 30000) faltitude_meters =0;
     ialtitude_feet = int(faltitude_meters*3.281);  // integer value of altitude in feet
 
     fkmph = gps.f_speed_kmph(); // speed in km/h
+
+    // Quick fix to ignore wrong data in calculations
+    if (int (fkmph) > 300) fkmph = 0;
 
     speed_kt = (int) gps.f_speed_knots(); // speed in knots for APRS
 
     // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course
     currentcourse = (int) gps.f_course();
 
-    if (currentcourse == 1000) Serial.println(F("DEBUG: Wrong course data from GPS"));
+    // Quick fix to ignore wrong data in calculations
+    if (currentcourse > 360 || currentcourse < 0) currentcourse=0;
 
     // Calculate difference of course to smartbeacon
     courseDelta = (int) ( previouscourse - currentcourse );
@@ -229,13 +224,10 @@ void loop()
     print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
     print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
     print_float(gps.f_course(), TinyGPS::GPS_INVALID_F_ANGLE, 7, 2);
-    print_float(gps.f_speed_kmph(), TinyGPS::GPS_INVALID_F_SPEED, 6, 2);
+    print_float(fkmph, TinyGPS::GPS_INVALID_F_SPEED, 6, 2);
     Serial.print(deg_to_nmea(lat, true));Serial.print(F("/"));Serial.print(deg_to_nmea(lon, false));
     Serial.print(F(" ")); Serial.print(faltitude_meters);Serial.print(F("/"));Serial.print(ialtitude_feet);
 
-    // TinyGPS reports TinyGPS::GPS_INVALID_F_ANGLE = 1000.0 for invalid course;
-    if (currentcourse != 1000)
-    {
     // Based on HamHUB Smart Beaconing(tm) algorithm
     if ( fkmph < LOW_SPEED ) {
       tx_interval = SLOW_RATE *1000L;
@@ -245,7 +237,7 @@ void loop()
     }
     else {
     // Interval inbetween low and high speed
-    tx_interval = ((FAST_BEACON_RATE * HIGH_SPEED) / fkmph ) *1000L ;
+      tx_interval = ((FAST_BEACON_RATE * HIGH_SPEED) / fkmph ) *1000L ;
     }
 
     turn_threshold = TURN_MIN + TURN_SLOPE / fkmph;
@@ -275,13 +267,6 @@ void loop()
       Serial.println(F("MANUAL UPDATE"));
       locationUpdate();
     }
-    }
-    else
-    {
-      //print dummy course/delta/turn_threshold
-      Serial.println(F(" *** *** ****"));
-
-    }
   }
   newData = false;
 }
@@ -296,10 +281,11 @@ void locationUpdate() {
 //in the form /A=aaaaaa, where aaaaaa is the altitude in feet. For example:
 //A=001234. The altitude may appear anywhere in the comment.
 //Source: APRS protocol
+//Which means /A=000XXXArduino APRS Tracker (29 characters)
 
   char comment []= "Arduino APRS Tracker";
   char temp[8];
-  char APRS_comment [36]="/A=";
+  char APRS_comment [32]="/A=";
 
   // Convert altitude in string and pad left
   sprintf(temp, "%06d", ialtitude_feet);
@@ -323,7 +309,11 @@ void locationUpdate() {
   while(digitalRead(LED_BUILTIN));
 
   // start SoftSerial again
-  GPSSerial.begin(9600);
+#ifdef NEO-6M
+   GPSSerial.begin(4800);
+#else
+   GPSSerial.begin(9600);
+#endif
 }
 
 /*****************************************************************************************/
