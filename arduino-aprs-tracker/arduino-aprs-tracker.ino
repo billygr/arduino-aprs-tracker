@@ -81,6 +81,8 @@ void setup()
   GPSSerial.flush();
 #endif
 
+  // Reduce NMEA messages
+  disableGPGLL();
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(GPS_FIX_LED,OUTPUT);
 
@@ -356,4 +358,24 @@ char* deg_to_nmea(long deg, boolean is_lat) {
     else conv_buf[8]='E';
     return conv_buf;
     }
+}
+
+void disableGPGLL()
+{
+  const char *msg = "PUBX,40,GLL,0,0,0,0,0";
+
+  // find checksum
+  int checksum = 0;
+  for (int i = 0; msg[i]; i++)
+    checksum ^= (unsigned char)msg[i];
+
+  // convert and create checksum HEX string
+  char checkTmp[8];
+  snprintf(checkTmp, sizeof(checkTmp)-1, "*%.2X", checksum);
+
+  // send to module
+  GPSSerial.print("$");
+  GPSSerial.print(msg);
+  GPSSerial.println(checkTmp);
+  GPSSerial.flush();
 }
