@@ -10,10 +10,10 @@
 #include <TinyGPS.h>
 #include <LibAPRS.h>
 
-// Enable this define NEO-6M if you are constantly getting wrong data,
+// Enable this define NEO6M if you are constantly getting wrong data,
 // the ADC ISR triggers during SoftwareSerial so we miss data coming from GPS
 // (for some reason only on this type of GPS and only when running on 9600 bps)
-//#define NEO-6M
+//#define NEO6M
 
 // Manual update button
 #define BUTTON_PIN 10
@@ -75,7 +75,7 @@ void setup()
   Serial.begin(115200);
   GPSSerial.begin(9600);
 
-#ifdef NEO-6M
+#ifdef NEO6M
   GPSSerial.print("$PUBX,41,1,0007,0003,4800,0*13\r\n");
   GPSSerial.begin(4800);
   GPSSerial.flush();
@@ -311,7 +311,7 @@ void locationUpdate() {
   while(digitalRead(LED_BUILTIN));
 
   // start SoftSerial again
-#ifdef NEO-6M
+#ifdef NEO6M
    GPSSerial.begin(4800);
 #else
    GPSSerial.begin(9600);
