@@ -18,6 +18,7 @@ install:
   - if [ ! -d "$HOME/arduino_ide/libraries/LibAPRS" ]; then git clone https://github.com/billygr/LibAPRS $HOME/arduino_ide/libraries/LibAPRS; fi
   - if [ ! -d "$HOME/arduino_ide/libraries/SimpleTimer" ]; then git clone https://github.com/jfturcot/SimpleTimer $HOME/arduino_ide/libraries/SimpleTimer; fi
   - if [ ! -d "$HOME/arduino_ide/libraries/TinyGPS" ]; then git clone https://github.com/mikalhart/TinyGPS $HOME/arduino_ide/libraries/TinyGPS; fi
+  - if [ ! -d "$HOME/arduino_ide/libraries/TinyGPSPlus" ]; then git clone https://github.com/mikalhart/TinyGPSPlus $HOME/arduino_ide/libraries/TinyGPSPlus; fi
 script:
   - build_platform uno
 notifications:

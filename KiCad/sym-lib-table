@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "APRS Tracker Lib")(type "KiCad")(uri "${KIPRJMOD}/APRS-Tracker_ArduinoProMini.kicad_sym")(options "")(descr ""))
+)
